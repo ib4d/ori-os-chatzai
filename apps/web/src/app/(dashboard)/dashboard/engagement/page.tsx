@@ -1,7 +1,9 @@
-'use client'
-
 import { EngagementView } from '@/components/engagement-view'
 
-export default function EngagementPage() {
+export const metadata = {
+    title: 'Engagement',
+}
+
+export default function Page() {
     return <EngagementView />
 }

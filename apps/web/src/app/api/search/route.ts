@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { withDb } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -42,3 +43,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data: EMPTY_RESULTS })
   }
 }
+

@@ -10,6 +10,7 @@ import { ActivitiesModule } from './activities/activities.module';
 import { TasksModule } from './tasks/tasks.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { WorkflowsModule } from './workflows/workflows.module';
+import { SEOModule } from './seo/seo.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -31,6 +32,7 @@ import { APP_GUARD } from '@nestjs/core';
         TasksModule,
         CampaignsModule,
         WorkflowsModule,
+        SEOModule,
     ],
     controllers: [AppController],
     providers: [

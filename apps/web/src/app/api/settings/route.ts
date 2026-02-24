@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { withDb } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -68,3 +69,4 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to update settings' }, { status: 500 })
   }
 }
+

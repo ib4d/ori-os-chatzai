@@ -1,7 +1,9 @@
-'use client'
-
 import { IntelligenceView } from '@/components/intelligence-view'
 
-export default function IntelligencePage() {
+export const metadata = {
+    title: 'Intelligence',
+}
+
+export default function Page() {
     return <IntelligenceView />
 }

@@ -1,31 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Zap, Menu, X, ChevronDown } from 'lucide-react'
+import { Zap, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAppStore } from '@/lib/store'
+import Link from 'next/link'
 
 export function MarketingHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { setMarketingPage, setCurrentView } = useAppStore()
-
-  const handleNavigate = (page: any) => {
-    setMarketingPage(page)
-    setIsMobileMenuOpen(false)
-    window.scrollTo(0, 0)
-  }
-
-  const handleStartTrial = () => {
-    setCurrentView('dashboard')
-  }
 
   const navItems = [
-    { name: 'System Core', id: 'core' },
-    { name: 'Deployments', id: 'deployments' },
-    { name: 'Security', id: 'security' },
-    { name: 'Pricing', id: 'pricing' },
-    { name: 'Docs', id: 'docs' },
+    { name: 'System Core', href: '/' },
+    { name: 'Features', href: '/features' },
+    { name: 'Pricing', href: '/pricing' },
+    { name: 'Docs', href: '/docs' },
   ]
 
   return (
@@ -33,13 +21,13 @@ export function MarketingHeader() {
       <nav className="h-full max-w-[1920px] mx-auto flex items-stretch">
         {/* Logo Segment */}
         <div className="flex items-center px-6 border-r border-white/10 min-w-[140px] md:min-w-[180px]">
-          <button
-            onClick={() => handleNavigate('home')}
+          <Link
+            href="/"
             className="flex items-center gap-2 cursor-pointer group"
           >
             <Zap className="h-5 w-5 text-axion-orange fill-current" />
             <span className="text-xl font-black tracking-[-0.05em] text-white">AXION</span>
-          </button>
+          </Link>
         </div>
 
         {/* Status Segment - Hidden on Small Screens */}
@@ -55,32 +43,32 @@ export function MarketingHeader() {
         {/* Navigation Segments - Desktop */}
         <div className="hidden md:flex flex-1 items-stretch overflow-hidden">
           {navItems.map((item) => (
-            <button
+            <Link
               key={item.name}
+              href={item.href}
               className="flex-1 px-4 flex items-center justify-center border-r border-white/10 text-[10px] font-mono font-bold text-white/50 hover:text-white hover:bg-white/5 transition-all uppercase tracking-[0.15em] whitespace-nowrap"
-              onClick={() => item.id === 'pricing' ? handleNavigate('pricing') : null}
             >
               {item.name}
-            </button>
+            </Link>
           ))}
         </div>
 
         {/* Auth / CTA Segments */}
         <div className="flex items-stretch flex-1 md:flex-initial">
-          <button
+          <Link
+            href="/dashboard"
             className="hidden sm:flex flex-1 md:flex-initial px-8 items-center justify-center border-r border-white/10 text-[10px] font-mono font-bold text-white/60 hover:text-white hover:bg-white/5 transition-all uppercase tracking-[0.15em]"
-            onClick={handleStartTrial}
           >
             Sign In
-          </button>
-          <button
+          </Link>
+          <Link
+            href="/dashboard"
             className="flex-1 md:flex-initial px-4 md:px-10 flex items-center justify-center bg-axion-orange text-black font-black text-xs uppercase tracking-tighter hover:bg-orange-500 transition-all group"
-            onClick={handleStartTrial}
           >
             <span className="hidden xs:inline">Request Demo</span>
             <span className="xs:hidden">Demo</span>
             <Zap className="ml-2 h-4 w-4 fill-current group-hover:translate-x-1 transition-transform" />
-          </button>
+          </Link>
 
           {/* Mobile Menu Toggle */}
           <button
@@ -102,21 +90,23 @@ export function MarketingHeader() {
             className="absolute top-16 left-0 right-0 bg-black border-b border-white/10 p-6 space-y-4 md:hidden"
           >
             {navItems.map((item) => (
-              <button
+              <Link
                 key={item.name}
+                href={item.href}
                 className="block w-full text-left text-[12px] font-mono font-bold text-white/60 hover:text-axion-orange uppercase tracking-widest py-2"
-                onClick={() => handleNavigate(item.id)}
+                onClick={() => setIsMobileMenuOpen(false)}
               >
                 {item.name}
-              </button>
+              </Link>
             ))}
             <div className="pt-4 border-t border-white/5">
-              <button
+              <Link
+                href="/dashboard"
                 className="block w-full text-center bg-white/5 border border-white/10 text-white py-3 font-mono text-[10px] tracking-widest uppercase"
-                onClick={handleStartTrial}
+                onClick={() => setIsMobileMenuOpen(false)}
               >
                 Sign In
-              </button>
+              </Link>
             </div>
           </motion.div>
         )}

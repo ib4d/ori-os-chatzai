@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   /* config options here */
+  transpilePackages: ["@ori-os/db", "@ori-os/core"],
   typescript: {
     ignoreBuildErrors: true,
   },

@@ -13,6 +13,8 @@
         "@nestjs/throttler": "^6.5.0",
         "@ori-os/core": "workspace:*",
         "@ori-os/db": "workspace:*",
+        "class-transformer": "^0.5.1",
+        "class-validator": "^0.14.3",
         "nestjs-cls": "^4.4.1",
         "reflect-metadata": "^0.1.13",
         "rxjs": "^7.8.1"

@@ -1,7 +1,9 @@
-'use client'
-
 import { CRMView } from '@/components/crm-view'
 
-export default function CRMPage() {
+export const metadata = {
+    title: 'CRM',
+}
+
+export default function Page() {
     return <CRMView />
 }

@@ -1,11 +1,15 @@
+import { auth } from '@/auth'
 import { withDb } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET() {
   try {
+    const session = await auth()
+    const orgId = session?.user?.organizationId || 'demo-org-001'
+
     const result = await withDb(async (db) => {
       return db.complianceProfile.findMany({
-        where: { organizationId: 'demo-org-001' },
+        where: { organizationId: orgId },
         orderBy: { isDefault: 'desc' },
       })
     })
@@ -19,11 +23,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    const orgId = session?.user?.organizationId || 'demo-org-001'
     const body = await request.json()
     const result = await withDb(async (db) => {
       return db.complianceProfile.create({
         data: {
-          organizationId: 'demo-org-001',
+          organizationId: orgId,
           name: body.name,
           description: body.description,
           gdprEnabled: body.gdprEnabled ?? true,
@@ -42,3 +48,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to create profile' }, { status: 500 })
   }
 }
+

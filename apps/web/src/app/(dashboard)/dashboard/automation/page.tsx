@@ -1,7 +1,9 @@
-'use client'
-
 import { AutomationView } from '@/components/automation-view'
 
-export default function AutomationPage() {
+export const metadata = {
+    title: 'Automation',
+}
+
+export default function Page() {
     return <AutomationView />
 }

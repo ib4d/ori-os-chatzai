@@ -2,10 +2,8 @@ import { PrismaClient } from '@prisma/client'
 
 export * from '@prisma/client'
 
-declare const process: any
-
 const globalForPrisma = globalThis as unknown as {
-  prisma: any
+  prisma: PrismaClient | undefined
 }
 
 export const prisma =

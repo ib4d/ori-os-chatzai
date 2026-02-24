@@ -1,7 +1,9 @@
-'use client'
-
 import { KnowledgeView } from '@/components/knowledge-view'
 
-export default function KnowledgePage() {
+export const metadata = {
+    title: 'Knowledge Hub',
+}
+
+export default function Page() {
     return <KnowledgeView />
 }

@@ -77,6 +77,7 @@ const navigationItems = [
     icon: Search,
     shortcut: 'MOD_S',
     href: '/dashboard/seo',
+    hidden: process.env.NEXT_PUBLIC_ENABLE_SEO_STUDIO !== 'true',
   },
   {
     id: 'compliance',
@@ -92,7 +93,7 @@ const navigationItems = [
     shortcut: 'MOD_K',
     href: '/dashboard/knowledge',
   },
-]
+].filter(item => !item.hidden)
 
 export function OriSidebar() {
   const { sidebarCollapsed, toggleSidebar } = useAppStore()

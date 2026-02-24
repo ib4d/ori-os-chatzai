@@ -1,11 +1,15 @@
+import { auth } from '@/auth'
 import { withDb } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
+    const session = await auth()
+    const orgId = session?.user?.organizationId || 'demo-org-001'
+
     const result = await withDb(async (db) => {
       const campaigns = await db.campaign.findMany({
-        where: { organizationId: 'demo-org-001' },
+        where: { organizationId: orgId },
       })
 
       const totalSent = campaigns.reduce((sum, c) => sum + c.sentCount, 0)
@@ -22,13 +26,13 @@ export async function GET() {
       const bounceRate = totalSent > 0 ? (totalBounced / totalSent) * 100 : 0
       const deliverabilityRate = totalSent > 0 ? ((totalSent - totalBounced) / totalSent) * 100 : 0
 
-      const domains = await db.domain.findMany({ where: { organizationId: 'demo-org-001' } })
+      const domains = await db.domain.findMany({ where: { organizationId: orgId } })
       const verifiedDomains = domains.filter(d => d.status === 'verified').length
       const avgReputation = domains.length > 0
         ? domains.reduce((sum, d) => sum + (d.reputationScore || 0), 0) / domains.length : 0
-      const templateCount = await db.emailTemplate.count({ where: { organizationId: 'demo-org-001' } })
+      const templateCount = await db.emailTemplate.count({ where: { organizationId: orgId } })
 
-      const dailyStats = []
+      const dailyStats: { date: string; sent: number; opened: number }[] = []
       const today = new Date()
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today)
@@ -59,7 +63,7 @@ export async function GET() {
     if (result) return NextResponse.json({ success: true, data: result })
 
     // Demo fallback
-    const dailyStats = []
+    const dailyStats: { date: string; sent: number; opened: number }[] = []
     const today = new Date()
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today)
@@ -87,3 +91,4 @@ export async function GET() {
     return NextResponse.json({ success: false, error: 'Failed to fetch engagement stats' }, { status: 500 })
   }
 }
+

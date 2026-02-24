@@ -1,5 +1,8 @@
+import { auth } from '@/auth'
 import { withDb } from '@/lib/db'
 import { NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
 
 const DEMO_DASHBOARD = {
   stats: {
@@ -54,7 +57,8 @@ const DEMO_DASHBOARD = {
 
 export async function GET() {
   try {
-    const orgId = 'demo-org-001'
+    const session = await auth()
+    const orgId = session?.user?.organizationId || 'demo-org-001'
 
     const result = await withDb(async (db) => {
       const [totalContacts, totalCompanies, activeDeals, pipelineValue, totalCampaigns, activeWorkflows] =

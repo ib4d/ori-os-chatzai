@@ -1,7 +1,9 @@
-'use client'
-
 import { DashboardView } from '@/components/dashboard-view'
 
-export default function DashboardPage() {
+export const metadata = {
+    title: 'Dashboard',
+}
+
+export default function Page() {
     return <DashboardView />
 }

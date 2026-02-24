@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { withDb } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -38,3 +39,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to create GDPR request' }, { status: 500 })
   }
 }
+

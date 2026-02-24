@@ -1,7 +1,9 @@
-'use client'
-
 import { SettingsView } from '@/components/settings-view'
 
-export default function SettingsPage() {
+export const metadata = {
+    title: 'Settings',
+}
+
+export default function Page() {
     return <SettingsView />
 }

@@ -14,9 +14,17 @@ export class TenantInterceptor implements NestInterceptor {
     intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
         const request = context.switchToHttp().getRequest();
 
-        // In production, this would come from the JWT payload
-        // For now, we'll allow an 'x-organization-id' header for development/testing
-        const organizationId = request.headers['x-organization-id'] || request.user?.organizationId;
+        // In production, organizationId MUST come from the authenticated user context (JWT/Session)
+        // We only allow the 'x-organization-id' header for development/testing purposes
+        const isProduction = process.env.NODE_ENV === 'production';
+        const headerOrgId = request.headers['x-organization-id'];
+        const userOrgId = request.user?.organizationId;
+
+        let organizationId = userOrgId;
+
+        if (!isProduction && headerOrgId) {
+            organizationId = headerOrgId;
+        }
 
         if (organizationId) {
             this.cls.set('organizationId', organizationId);
