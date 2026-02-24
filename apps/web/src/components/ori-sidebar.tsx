@@ -136,7 +136,7 @@ export function OriSidebar() {
 
         {/* System ID / Context */}
         {!sidebarCollapsed && (
-          <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+          <div className="px-6 py-4 border-b border-white/5 bg-white/2">
             <div className="flex items-center gap-2 text-[9px] font-mono text-white/30 uppercase tracking-[0.2em] mb-1">
               <Terminal size={10} />
               Session_Context

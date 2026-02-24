@@ -170,7 +170,7 @@ export function DashboardView() {
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 flex items-center justify-center">
                 <div className="absolute w-full h-full border border-axion-orange/20 rounded-full animate-spin-slow" />
                 <div className="absolute w-4/5 h-4/5 border border-white/10 rounded-full animate-reverse-spin" />
-                <div className="w-32 h-32 bg-axion-orange/20 blur-[40px] rounded-full animate-pulse" />
+                <div className="w-32 h-32 bg-axion-orange/20 blur-2xl rounded-full animate-pulse" />
                 <div className="relative w-16 h-16 border-2 border-axion-orange flex items-center justify-center bg-black">
                   <Zap className="text-axion-orange fill-current animate-pulse" />
                 </div>

@@ -26,7 +26,7 @@ export function HeroSection() {
             <span className={num === 1 ? "text-axion-orange font-mono text-[10px] border border-axion-orange/50 p-1" : "text-white/20 font-mono text-[10px] hover:text-white transition-colors"}>
               {num.toString().padStart(2, '0')}
             </span>
-            {num === 1 && <div className="w-[1px] h-12 bg-axion-orange" />}
+            {num === 1 && <div className="w-px h-12 bg-axion-orange" />}
           </div>
         ))}
         <div className="mt-auto -rotate-90 whitespace-nowrap">
