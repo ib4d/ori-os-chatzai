@@ -1,0 +1,23 @@
+{
+    "name": "@ori-os/worker",
+    "version": "0.1.0",
+    "scripts": {
+        "build": "nest build",
+        "dev": "nest start --watch",
+        "start": "nest start"
+    },
+    "dependencies": {
+        "@nestjs/common": "^10.0.0",
+        "@nestjs/core": "^10.0.0",
+        "reflect-metadata": "^0.1.13",
+        "rxjs": "^7.8.1",
+        "@ori-os/db": "workspace:*",
+        "@ori-os/core": "workspace:*"
+    },
+    "devDependencies": {
+        "@nestjs/cli": "^10.0.0",
+        "@nestjs/schematics": "^10.0.0",
+        "@types/node": "^20.0.0",
+        "typescript": "^5.0.0"
+    }
+}

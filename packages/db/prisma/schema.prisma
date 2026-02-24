@@ -1,0 +1,1299 @@
+// Ori-OS Prisma Schema
+// Comprehensive multi-tenant SaaS platform schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// CORE ENTITIES - Organization & Auth
+// ============================================
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logo        String?
+  website     String?
+  industry    String?
+  size        String?  // startup, small, medium, large, enterprise
+  
+  // Subscription & Billing
+  plan        String   @default("starter") // starter, growth, agency
+  planStatus  String   @default("active") // active, past_due, canceled
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  subscriptionStatus String?
+  subscriptionCurrentPeriodEnd DateTime?
+  seatLimits  Int      @default(5)
+  
+  // Settings
+  timezone    String   @default("UTC")
+  locale      String   @default("en")
+  currency    String   @default("USD")
+  
+  // Compliance
+  gdprEnabled Boolean  @default(false)
+  gdprDefaultRetention Int? // days
+  gdprContactEmail String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  members              OrganizationMember[]
+  invitations          Invitation[]
+  domains              Domain[]
+  mailboxes            Mailbox[]
+  companies            Company[]
+  contacts             Contact[]
+  deals                Deal[]
+  activities           Activity[]
+  tasks                Task[]
+  notes                Note[]
+  segments             Segment[]
+  campaigns            Campaign[]
+  emailTemplates       EmailTemplate[]
+  workflows            Workflow[]
+  workflowRuns         WorkflowRun[]
+  events               Event[]
+  auditLogs            AuditLog[]
+  gdprRequests         GDPRRequest[]
+  warmupPlans          WarmupPlan[]
+  validationJobs       ValidationJob[]
+  complianceProfiles   ComplianceProfile[]
+  workspacePages       WorkspacePage[]
+  knowledgeDatabases   KnowledgeDatabase[]
+  knowledgeTemplates   KnowledgeTemplate[]
+  knowledgeForms       KnowledgeForm[]
+  apiKeys              ApiKey[]
+  connectors           Connector[]
+  seoProjects          SEOProject[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  image         String?
+  passwordHash  String?
+  emailVerified DateTime?
+  
+  // 2FA
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
+  
+  // Preferences
+  timezone      String   @default("UTC")
+  locale        String   @default("en")
+  theme         String   @default("dark")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  memberships   OrganizationMember[]
+  invitations   Invitation[]     @relation("SentInvitations")
+  createdActivities Activity[]  @relation("ActivityCreator")
+  assignedTasks Task[]          @relation("AssignedTasks")
+  createdTasks  Task[]          @relation("TaskCreator")
+  notes         Note[]
+  events        Event[]
+  auditLogs     AuditLog[]
+  sessions      Session[]
+  accounts      Account[]
+  apiKeys       ApiKey[]
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String   @default("viewer") // owner, admin, manager, operator, viewer
+  
+  joinedAt       DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([organizationId, userId])
+}
+
+model Invitation {
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String
+  role           String   @default("viewer")
+  token          String   @unique
+  invitedBy      String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  
+  createdAt      DateTime @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter        User         @relation("SentInvitations", fields: [invitedBy], references: [id])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String   // google, microsoft, etc.
+  providerId   String
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerId])
+}
+
+model ApiKey {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  name           String
+  keyHash        String   @unique
+  prefix         String   // First 8 chars for identification
+  scopes         String   // JSON array of scopes
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  
+  createdAt      DateTime @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// CONNECTORS - External API Integrations
+// ============================================
+
+model Connector {
+  id             String   @id @default(cuid())
+  organizationId String
+  type           String   // google, microsoft, sendgrid, openai, etc.
+  name           String
+  config         String   // JSON encrypted config
+  credentials    String?  // JSON encrypted credentials
+  status         String   @default("disconnected") // connected, disconnected, error
+  lastSyncAt     DateTime?
+  errorMessage   String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@unique([organizationId, type])
+}
+
+// ============================================
+// EMAIL & DELIVERABILITY
+// ============================================
+
+model Domain {
+  id             String   @id @default(cuid())
+  organizationId String
+  domain         String
+  status         String   @default("pending") // pending, verifying, verified, failed
+  
+  // DNS Records
+  spfRecord      String?
+  spfStatus      String   @default("pending")
+  dkimRecord     String?
+  dkimStatus     String   @default("pending")
+  dmarcRecord    String?
+  dmarcStatus    String   @default("pending")
+  mxRecords      String?  // JSON array
+  
+  // Reputation
+  reputationScore Int?
+  bounceRate     Float?
+  spamRate       Float?
+  
+  // Warmup
+  warmupEnabled  Boolean  @default(false)
+  warmupStatus   String?  // pending, in_progress, completed
+  
+  // Limits
+  dailyLimit     Int      @default(100)
+  monthlyLimit   Int      @default(3000)
+  
+  verifiedAt     DateTime?
+  lastAuditAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mailboxes      Mailbox[]
+  warmupPlans    WarmupPlan[]
+}
+
+model Mailbox {
+  id             String   @id @default(cuid())
+  organizationId String
+  domainId       String
+  email          String
+  displayName    String?
+  
+  // Connection
+  provider       String   // gmail, outlook, smtp, imap
+  imapConfig     String?  // JSON encrypted
+  smtpConfig     String?  // JSON encrypted
+  oauthToken     String?  // JSON encrypted
+  
+  status         String   @default("pending") // pending, connected, error
+  
+  // Sending limits
+  dailySent      Int      @default(0)
+  dailyLimit     Int      @default(50)
+  
+  // Warmup
+  warmupEnabled  Boolean  @default(false)
+  warmupProgress Int      @default(0)
+  
+  lastSyncAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  domain         Domain       @relation(fields: [domainId], references: [id], onDelete: Cascade)
+}
+
+model WarmupPlan {
+  id             String   @id @default(cuid())
+  organizationId String
+  domainId       String
+  status         String   @default("active") // active, paused, completed
+  
+  // Configuration
+  startVolume    Int      @default(5)
+  targetVolume   Int      @default(100)
+  currentVolume  Int      @default(5)
+  rampDays       Int      @default(30)
+  
+  // Stats
+  emailsSent     Int      @default(0)
+  emailsReceived Int      @default(0)
+  avgOpenRate    Float?
+  avgReplyRate   Float?
+  
+  startDate      DateTime @default(now())
+  endDate        DateTime?
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  domain         Domain       @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  jobs           WarmupJob[]
+}
+
+model WarmupJob {
+  id             String   @id @default(cuid())
+  warmupPlanId   String
+  type           String   // send, reply
+  status         String   @default("pending") // pending, sent, delivered, opened, replied, failed
+  
+  fromEmail      String
+  toEmail        String
+  subject        String
+  body           String?
+  
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  openedAt       DateTime?
+  
+  createdAt      DateTime @default(now())
+  
+  warmupPlan     WarmupPlan  @relation(fields: [warmupPlanId], references: [id], onDelete: Cascade)
+}
+
+model ValidationJob {
+  id             String   @id @default(cuid())
+  organizationId String
+  type           String   // list, email
+  status         String   @default("pending") // pending, processing, completed, failed
+  
+  // Input
+  sourceType     String   // upload, segment, manual
+  totalItems     Int
+  processedItems Int      @default(0)
+  
+  // Results
+  validCount     Int      @default(0)
+  invalidCount   Int      @default(0)
+  riskyCount     Int      @default(0)
+  unknownCount   Int      @default(0)
+  
+  results        String?  // JSON with detailed results
+  
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// CRM - Companies, Contacts, Deals
+// ============================================
+
+model Company {
+  id             String   @id @default(cuid())
+  organizationId String
+  externalId     String?  // ID from external source
+  
+  // Basic Info
+  name           String
+  domain         String?
+  website        String?
+  logo           String?
+  description    String?
+  
+  // Classification
+  industry       String?
+  size           String?  // 1-10, 11-50, 51-200, 201-500, 501-1000, 1000+
+  revenue        String?
+  type           String?  // prospect, customer, partner, competitor
+  status         String   @default("prospect") // prospect, qualified, customer, churned
+  
+  // Location
+  street         String?
+  city           String?
+  state          String?
+  country        String?
+  postalCode     String?
+  
+  // Social
+  linkedin       String?
+  twitter        String?
+  facebook       String?
+  
+  // Enrichment
+  enrichmentStatus String?
+  enrichmentData   String?  // JSON with enrichment results
+  lastEnrichedAt   DateTime?
+  
+  // Scoring
+  score          Int?
+  scoreReasons   String?  // JSON array
+  
+  // Custom Fields
+  customFields   String?  // JSON object
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts       Contact[]
+  deals          Deal[]
+  activities     Activity[]
+  notes          Note[]
+  
+  @@index([organizationId, domain])
+  @@index([organizationId, status])
+}
+
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String
+  companyId      String?
+  externalId     String?
+  
+  // Basic Info
+  firstName      String?
+  lastName       String?
+  email          String?
+  phone          String?
+  image          String?
+  
+  // Job
+  title          String?
+  department     String?
+  seniority      String?  // junior, mid, senior, executive, c-level
+  
+  // Social
+  linkedin       String?
+  twitter        String?
+  
+  // Status
+  status         String   @default("lead") // lead, prospect, qualified, customer, churned
+  source         String?  // manual, import, linkedin, website, referral
+  
+  // Engagement
+  lastContactedAt DateTime?
+  responseCount   Int      @default(0)
+  openCount       Int      @default(0)
+  clickCount      Int      @default(0)
+  
+  // Opt-out
+  emailOptOut    Boolean  @default(false)
+  emailBounced   Boolean  @default(false)
+  phoneOptOut    Boolean  @default(false)
+  
+  // Enrichment
+  enrichmentStatus String?
+  enrichmentData   String?
+  lastEnrichedAt   DateTime?
+  
+  // Scoring
+  score          Int?
+  scoreReasons   String?
+  
+  // Validation
+  emailValid     String?  // valid, invalid, risky, unknown
+  emailValidatedAt DateTime?
+  
+  // Custom Fields
+  customFields   String?
+  
+  // GDPR
+  gdprConsent    Boolean  @default(false)
+  gdprConsentAt  DateTime?
+  gdprSource     String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company        Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  deals          Deal[]
+  activities     Activity[]
+  notes          Note[]
+  tasks          Task[]
+  campaignContacts CampaignContact[]
+  
+  @@unique([organizationId, email])
+  @@index([organizationId, companyId])
+  @@index([organizationId, status])
+  @@index([organizationId, email])
+}
+
+model Deal {
+  id             String   @id @default(cuid())
+  organizationId String
+  companyId      String?
+  primaryContactId String?
+  
+  // Basic Info
+  name           String
+  value          Float?
+  currency       String   @default("USD")
+  probability    Int?     // 0-100
+  
+  // Pipeline
+  stage          String   @default("discovery") // discovery, qualification, proposal, negotiation, closed_won, closed_lost
+  status         String   @default("open") // open, won, lost
+  
+  // Dates
+  expectedCloseDate DateTime?
+  actualCloseDate   DateTime?
+  
+  // Reason
+  lostReason     String?
+  
+  // Custom Fields
+  customFields   String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company        Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  primaryContact Contact?      @relation(fields: [primaryContactId], references: [id], onDelete: SetNull)
+  activities     Activity[]
+  
+  @@index([organizationId, stage])
+  @@index([organizationId, status])
+}
+
+model Activity {
+  id             String   @id @default(cuid())
+  organizationId String
+  companyId      String?
+  contactId      String?
+  dealId         String?
+  createdById    String?
+  
+  type           String   // email_sent, email_opened, email_clicked, email_bounced, call, meeting, note, task_completed, deal_stage_changed
+  
+  // Content
+  title          String?
+  description    String?
+  metadata       String?  // JSON with type-specific data
+  
+  // Timestamps
+  occurredAt     DateTime @default(now())
+  
+  createdAt      DateTime @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company        Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  deal           Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  creator        User?         @relation("ActivityCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  
+  @@index([organizationId, type])
+  @@index([organizationId, contactId])
+  @@index([organizationId, companyId])
+}
+
+model Task {
+  id             String   @id @default(cuid())
+  organizationId String
+  assigneeId     String?
+  createdById    String?
+  contactId      String?
+  
+  // Content
+  title          String
+  description    String?
+  
+  // Status
+  status         String   @default("pending") // pending, in_progress, completed, cancelled
+  priority       String   @default("medium") // low, medium, high, urgent
+  
+  // Due
+  dueDate        DateTime?
+  completedAt    DateTime?
+  
+  // Recurrence
+  recurring      Boolean  @default(false)
+  recurrenceRule String?  // RRULE format
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignee       User?         @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator        User?         @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  
+  @@index([organizationId, status])
+  @@index([organizationId, assigneeId])
+}
+
+model Note {
+  id             String   @id @default(cuid())
+  organizationId String
+  companyId      String?
+  contactId      String?
+  userId         String
+  
+  content        String
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company        Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Segment {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  
+  // Filter definition
+  filters        String   // JSON with filter rules
+  isDynamic      Boolean  @default(true)
+  
+  // Stats
+  contactCount   Int      @default(0)
+  lastCalculatedAt DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaigns      Campaign[]
+  
+  @@index([organizationId])
+}
+
+// ============================================
+// ENGAGEMENT - Campaigns & Email
+// ============================================
+
+model Campaign {
+  id             String   @id @default(cuid())
+  organizationId String
+  segmentId      String?
+  
+  name           String
+  description    String?
+  type           String   @default("email") // email, linkedin, multi_channel
+  status         String   @default("draft") // draft, scheduled, active, paused, completed, cancelled
+  
+  // Schedule
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  
+  // Stats
+  totalRecipients Int     @default(0)
+  sentCount      Int      @default(0)
+  deliveredCount Int      @default(0)
+  openedCount    Int      @default(0)
+  clickedCount   Int      @default(0)
+  repliedCount   Int      @default(0)
+  bouncedCount   Int      @default(0)
+  unsubscribedCount Int   @default(0)
+  
+  // Settings
+  trackingEnabled Boolean @default(true)
+  unsubscribeLink Boolean @default(true)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  segment        Segment?     @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  steps          SequenceStep[]
+  campaignContacts CampaignContact[]
+  
+  @@index([organizationId, status])
+}
+
+model SequenceStep {
+  id             String   @id @default(cuid())
+  campaignId     String
+  order          Int
+  
+  type           String   // email, linkedin_connect, linkedin_message, task, delay
+  delayDays      Int      @default(0)
+  delayHours     Int      @default(0)
+  
+  // Email content
+  subject        String?
+  previewText    String?
+  bodyHtml       String?
+  bodyText       String?
+  templateId     String?
+  
+  // LinkedIn
+  linkedinMessageType String?
+  linkedinMessage     String?
+  
+  // Task
+  taskTitle      String?
+  taskDescription String?
+  
+  // Stats
+  sentCount      Int      @default(0)
+  openedCount    Int      @default(0)
+  clickedCount   Int      @default(0)
+  repliedCount   Int      @default(0)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  @@index([campaignId])
+}
+
+model CampaignContact {
+  id             String   @id @default(cuid())
+  campaignId     String
+  contactId      String
+  
+  status         String   @default("pending") // pending, sent, delivered, opened, clicked, replied, bounced, unsubscribed
+  currentStep    Int      @default(0)
+  
+  // Tracking
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  openedAt       DateTime?
+  clickedAt      DateTime?
+  repliedAt      DateTime?
+  bouncedAt      DateTime?
+  unsubscribedAt DateTime?
+  
+  // Error
+  errorMessage   String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  @@unique([campaignId, contactId])
+}
+
+model EmailTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  category       String?  // outreach, follow_up, introduction, etc.
+  
+  subject        String
+  previewText    String?
+  bodyHtml       String
+  bodyText       String?
+  
+  // Variables
+  variables      String?  // JSON array of variable names
+  
+  // Stats
+  useCount       Int      @default(0)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// AUTOMATION - Workflow Engine
+// ============================================
+
+model Workflow {
+  id             String   @id @default(cuid())
+  organizationId String
+  
+  name           String
+  description    String?
+  category       String?  // lead_capture, lead_research, outreach, etc.
+  
+  status         String   @default("draft") // draft, active, paused, archived
+  
+  // Definition
+  triggerType    String   // manual, webhook, schedule, event
+  triggerConfig  String?  // JSON
+  nodes          String   // JSON array of workflow nodes
+  edges          String   // JSON array of connections
+  
+  // Settings
+  errorHandling  String   @default("stop") // stop, continue, retry
+  maxRetries     Int      @default(3)
+  
+  // Stats
+  runCount       Int      @default(0)
+  successCount   Int      @default(0)
+  errorCount     Int      @default(0)
+  lastRunAt      DateTime?
+  
+  // Template
+  isTemplate     Boolean  @default(false)
+  templateCategory String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs           WorkflowRun[]
+  
+  @@index([organizationId, status])
+  @@index([organizationId, category])
+}
+
+model WorkflowRun {
+  id             String   @id @default(cuid())
+  organizationId String
+  workflowId     String
+  
+  status         String   @default("pending") // pending, running, completed, failed, cancelled
+  triggerType    String
+  triggerData    String?  // JSON
+  
+  // Execution
+  startedAt      DateTime?
+  completedAt    DateTime?
+  duration       Int?     // milliseconds
+  
+  // Result
+  output         String?  // JSON
+  error          String?
+  
+  createdAt      DateTime @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workflow       Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  steps          WorkflowRunStep[]
+  
+  @@index([organizationId, workflowId])
+  @@index([organizationId, status])
+}
+
+model WorkflowRunStep {
+  id             String   @id @default(cuid())
+  workflowRunId  String
+  nodeId         String
+  nodeType       String
+  
+  status         String   @default("pending") // pending, running, completed, failed, skipped
+  input          String?  // JSON
+  output         String?  // JSON
+  error          String?
+  
+  startedAt      DateTime?
+  completedAt    DateTime?
+  duration       Int?
+  
+  createdAt      DateTime @default(now())
+  
+  workflowRun    WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  
+  @@index([workflowRunId])
+}
+
+// ============================================
+// SEO - SEO Studio Module
+// ============================================
+
+model SEOProject {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  domain         String
+  description    String?
+  
+  status         String   @default("active") // active, archived
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  keywords       SEOKeyword[]
+  crawls         SEOCrawl[]
+  gscConnection  GSCConnection?
+  
+  @@index([organizationId])
+}
+
+model SEOKeyword {
+  id             String   @id @default(cuid())
+  projectId      String
+  keyword        String
+  targetUrl      String?
+  
+  // Stats
+  difficulty     Int?     // 0-100
+  volume         Int?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  project        SEOProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  rankings       SEORanking[]
+  
+  @@unique([projectId, keyword])
+}
+
+model SEORanking {
+  id             String   @id @default(cuid())
+  keywordId      String
+  rank           Int
+  url            String?
+  date           DateTime @default(now())
+  
+  keyword        SEOKeyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  
+  @@index([keywordId, date])
+}
+
+model SEOCrawl {
+  id             String   @id @default(cuid())
+  projectId      String
+  status         String   @default("pending") // pending, crawling, completed, failed
+  
+  pagesCrawled   Int      @default(0)
+  totalIssues    Int      @default(0)
+  
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  
+  project        SEOProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues         SEOIssue[]
+}
+
+model SEOIssue {
+  id             String   @id @default(cuid())
+  crawlId        String
+  url            String
+  type           String   // missing_title, slow_load, broken_link, etc.
+  severity       String   // critical, warning, info
+  message        String
+  
+  createdAt      DateTime @default(now())
+  
+  crawl          SEOCrawl @relation(fields: [crawlId], references: [id], onDelete: Cascade)
+}
+
+model GSCConnection {
+  id             String   @id @default(cuid())
+  projectId      String   @unique
+  siteUrl        String
+  accessToken    String?  // Encrypted
+  refreshToken   String?  // Encrypted
+  expiresAt      DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  project        SEOProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// ANALYTICS - Events
+// ============================================
+
+model Event {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  
+  type           String
+  category       String?  // page_view, email, campaign, workflow, etc.
+  
+  // Properties
+  properties     String?  // JSON
+  
+  // Context
+  source         String?  // web, api, automation
+  ipAddress      String?
+  userAgent      String?
+  
+  createdAt      DateTime @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([organizationId, type])
+  @@index([organizationId, createdAt])
+}
+
+// ============================================
+// COMPLIANCE & AUDIT
+// ============================================
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  
+  action         String   // contact_created, campaign_sent, workflow_run, etc.
+  resource       String   // contact, campaign, workflow, etc.
+  resourceId     String?
+  
+  // Details
+  changes        String?  // JSON with before/after
+  metadata       String?  // JSON
+  
+  // Context
+  ipAddress      String?
+  userAgent      String?
+  
+  createdAt      DateTime @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([organizationId, action])
+  @@index([organizationId, resource, resourceId])
+}
+
+model GDPRRequest {
+  id             String   @id @default(cuid())
+  organizationId String
+  
+  type           String   // export, delete
+  status         String   @default("pending") // pending, processing, completed, failed
+  
+  contactEmail   String
+  contactId      String?
+  
+  // Request details
+  requestedAt    DateTime @default(now())
+  completedAt    DateTime?
+  
+  // Result
+  downloadUrl    String?
+  expiresAt      DateTime?
+  
+  // Error
+  errorMessage   String?
+  
+  createdAt      DateTime @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@index([organizationId, status])
+}
+
+model ComplianceProfile {
+  id             String   @id @default(cuid())
+  organizationId String
+  
+  name           String   // EU-Strict, US-Standard, etc.
+  description    String?
+  
+  // Settings
+  gdprEnabled    Boolean  @default(true)
+  ccpaEnabled    Boolean  @default(false)
+  
+  // Retention
+  contactRetentionDays Int?
+  activityRetentionDays Int?
+  
+  // Consent
+  requireConsent Boolean  @default(true)
+  consentTypes   String?  // JSON array
+  
+  // Data processing
+  allowedCountries String? // JSON array
+  restrictedData   String? // JSON array of restricted fields
+  
+  isDefault      Boolean  @default(false)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// KNOWLEDGE - Notion-like Module
+// ============================================
+
+model WorkspacePage {
+  id             String   @id @default(cuid())
+  organizationId String
+  parentId       String?
+  
+  // Basic
+  title          String
+  icon          String?  // emoji or image URL
+  coverImage    String?
+  
+  // Content
+  content       String?  // JSON with block structure
+  
+  // Type
+  type          String   @default("page") // page, database, task, project
+  
+  // Layout
+  fullWidth     Boolean  @default(false)
+  
+  // Permissions
+  isPublic      Boolean  @default(false)
+  
+  // Ordering
+  order         Int      @default(0)
+  
+  // Archive
+  isArchived    Boolean  @default(false)
+  archivedAt    DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent        WorkspacePage?  @relation("PageHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children      WorkspacePage[] @relation("PageHierarchy")
+  blocks        Block[]
+  database      KnowledgeDatabase?
+  
+  @@index([organizationId, parentId])
+  @@index([organizationId, type])
+}
+
+model Block {
+  id             String   @id @default(cuid())
+  pageId         String
+  
+  // Type
+  type           String   // text, heading1, heading2, heading3, bulleted_list, numbered_list, todo, toggle, callout, quote, divider, code, image, file, bookmark, embed, database
+  
+  // Content
+  content        String?  // JSON with block content
+  properties     String?  // JSON with block properties
+  
+  // Relations
+  parentId       String?
+  
+  // Ordering
+  order          Int      @default(0)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  page           WorkspacePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  parent         Block?        @relation("BlockHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children       Block[]       @relation("BlockHierarchy")
+  
+  @@index([pageId])
+}
+
+model KnowledgeDatabase {
+  id             String   @id @default(cuid())
+  organizationId String
+  pageId         String   @unique
+  
+  name           String
+  description    String?
+  icon           String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  page           WorkspacePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  properties     KnowledgeProperty[]
+  views          KnowledgeView[]
+  rows           KnowledgeRow[]
+  forms          KnowledgeForm[]
+}
+
+model KnowledgeProperty {
+  id             String   @id @default(cuid())
+  databaseId     String
+  
+  name           String
+  type           String   // text, number, select, multi_select, date, person, status, relation, rollup, formula, files, url, email, phone, checkbox
+  
+  // Configuration
+  config         String?  // JSON with type-specific config (options for select, formula for formula, etc.)
+  
+  order          Int      @default(0)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  database       KnowledgeDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  
+  @@unique([databaseId, name])
+  @@index([databaseId])
+}
+
+model KnowledgeView {
+  id             String   @id @default(cuid())
+  databaseId     String
+  
+  name           String
+  type           String   // table, board, calendar, timeline, gallery, list
+  
+  // Configuration
+  filters        String?  // JSON
+  sorts          String?  // JSON
+  groupBy        String?  // property name for board/grouping
+  visibleProperties String? // JSON array of property IDs
+  
+  isDefault      Boolean  @default(false)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  database       KnowledgeDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+}
+
+model KnowledgeRow {
+  id             String   @id @default(cuid())
+  databaseId     String
+  
+  // Values stored as JSON
+  values         String   // JSON object { propertyId: value }
+  
+  // Ordering
+  order          Int      @default(0)
+  
+  // Relations
+  linkedContactId String?
+  linkedCompanyId String?
+  linkedDealId    String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  database       KnowledgeDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  comments       KnowledgeComment[]
+  
+  @@index([databaseId])
+}
+
+model KnowledgeComment {
+  id             String   @id @default(cuid())
+  rowId          String
+  userId         String?
+  
+  content        String
+  resolved       Boolean  @default(false)
+  resolvedAt     DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  row            KnowledgeRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
+}
+
+model KnowledgeTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  
+  name           String
+  description    String?
+  category       String?  // project, meeting, personal, business
+  
+  // Structure
+  structure      String   // JSON with pages and blocks
+  
+  isPublic       Boolean  @default(false)
+  useCount       Int      @default(0)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model KnowledgeForm {
+  id             String   @id @default(cuid())
+  organizationId String
+  databaseId     String?
+  
+  name           String
+  description    String?
+  
+  // Configuration
+  fields         String   // JSON array of form fields
+  settings       String?  // JSON with form settings
+  
+  // Responses
+  responseCount  Int      @default(0)
+  
+  isPublic       Boolean  @default(true)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  database       KnowledgeDatabase? @relation(fields: [databaseId], references: [id], onDelete: SetNull)
+}
